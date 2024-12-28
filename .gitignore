@@ -1,0 +1,8 @@
+*.exe
+players
+.idea
+resources
+world
+*.toml
+examlpe
+examlpe/*
