@@ -1,4 +1,4 @@
-package path_type
+package path
 
 //type BlockCost struct {
 //	Block world.Block

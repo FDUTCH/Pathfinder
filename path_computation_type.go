@@ -4,7 +4,6 @@ import (
 	"github.com/df-mc/dragonfly/server/block"
 	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/world"
-	"pathfind/util"
 )
 
 type PathComputationType byte
@@ -63,8 +62,10 @@ func isCube(bbox cube.BBox) bool {
 	x := bbox.Width()
 	y := bbox.Height()
 	z := bbox.Length()
-	return util.Abs(x-y) < 0.000001 && util.Abs(y-z) < 0.000001
+	return Abs(x-y) < elision && Abs(y-z) < elision
 }
+
+const elision = 0.000001
 
 const (
 	ComputationTypeLand PathComputationType = iota

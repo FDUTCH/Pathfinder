@@ -1,9 +1,9 @@
 package pathfind
 
 import (
+	"github.com/FDUTCH/pathfind/path"
 	"github.com/df-mc/dragonfly/server/block/cube"
-	"pathfind/path_type"
-	"pathfind/util"
+	"golang.org/x/exp/constraints"
 )
 
 type Node struct {
@@ -14,7 +14,7 @@ type Node struct {
 	Closed         bool
 	walkedDistance float64
 	CostMalus      float64
-	BlockPathType  path_type.BlockPathType
+	BlockPathType  path.BlockPathType
 }
 
 func NewNode(pos cube.Pos) *Node {
@@ -32,7 +32,7 @@ func (n *Node) OpenSet() bool {
 }
 
 func (n *Node) distanceManhattan(target cube.Pos) int {
-	return util.Abs(target.X()-n.X()) + util.Abs(target.Y()-n.Y()) + util.Abs(target.Z()-n.Z())
+	return Abs(target.X()-n.X()) + Abs(target.Y()-n.Y()) + Abs(target.Z()-n.Z())
 }
 
 func (n *Node) distanceSquared(node *Node) float64 {
@@ -45,4 +45,11 @@ func (n *Node) distance(node *Node) float64 {
 
 func (n *Node) Equals(other *Node) bool {
 	return n.Pos == other.Pos
+}
+
+func Abs[T constraints.Integer | constraints.Float](a T) T {
+	if a < 0 {
+		return -a
+	}
+	return a
 }

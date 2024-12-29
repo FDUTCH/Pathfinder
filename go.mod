@@ -1,9 +1,9 @@
-module pathfind
+module github.com/FDUTCH/pathfind
 
 go 1.23
 
 require (
-	github.com/df-mc/dragonfly v0.9.20-0.20241224203752-918a90491313
+	github.com/df-mc/dragonfly v0.9.20-0.20241228162105-0eb07eca8413
 	github.com/go-gl/mathgl v1.1.0
 	github.com/pelletier/go-toml v1.9.5
 	golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c

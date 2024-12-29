@@ -1,10 +1,10 @@
 package pathfind
 
 import (
+	"github.com/FDUTCH/pathfind/path"
 	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/world"
 	"math"
-	"pathfind/path_type"
 	"slices"
 )
 
@@ -17,7 +17,7 @@ type PathFinder struct{}
 func (PathFinder) FindPath(evaluator NodeEvaluator, source world.BlockSource, pos, target cube.Pos, maxVisitedNodes int, maxDistanceFromStart float64, reachRange int) *Path {
 	evaluator.Prepare(source, pos)
 
-	startNode := evaluator.Start()
+	startNode := evaluator.StartNode()
 
 	actualTarget := evaluator.Goal(target)
 
@@ -101,13 +101,13 @@ func reconstructPath(startNode *Node, target cube.Pos, reached bool) *Path {
 }
 
 type NodeEvaluator interface {
-	Prepare(blockGetter world.BlockSource, pos cube.Pos)
+	Prepare(source world.BlockSource, pos cube.Pos)
 	Done()
 	Node(pos cube.Pos) *Node
-	Start() *Node
+	StartNode() *Node
 	Goal(pos cube.Pos) *Target
 	TargetFromNode(node *Node) *Target
 	Neighbors(node *Node) []*Node
-	CachedBlockPathType(blockGetter world.BlockSource, pos cube.Pos) path_type.BlockPathType
-	BlockPathType(blockGetter world.BlockSource, pos cube.Pos) path_type.BlockPathType
+	CachedBlockPathType(source world.BlockSource, pos cube.Pos) path.BlockPathType
+	BlockPathType(source world.BlockSource, pos cube.Pos) path.BlockPathType
 }
