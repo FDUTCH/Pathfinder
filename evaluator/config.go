@@ -1,7 +1,7 @@
 package evaluator
 
 import (
-	"github.com/FDUTCH/pathfind/path"
+	"github.com/FDUTCH/Pathfinder/path"
 	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/world"
 	"github.com/go-gl/mathgl/mgl64"

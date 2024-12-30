@@ -1,9 +1,9 @@
 package evaluator
 
 import (
-	"github.com/FDUTCH/pathfind"
-	"github.com/FDUTCH/pathfind/internal/util"
-	"github.com/FDUTCH/pathfind/path"
+	"github.com/FDUTCH/Pathfinder"
+	"github.com/FDUTCH/Pathfinder/internal/util"
+	"github.com/FDUTCH/Pathfinder/path"
 	"github.com/df-mc/dragonfly/server/block"
 	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/block/cube/trace"

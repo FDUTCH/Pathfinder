@@ -1,7 +1,7 @@
 package pathfind
 
 import (
-	"github.com/FDUTCH/pathfind/path"
+	"github.com/FDUTCH/Pathfinder/path"
 	"github.com/df-mc/dragonfly/server/block/cube"
 	"golang.org/x/exp/constraints"
 )

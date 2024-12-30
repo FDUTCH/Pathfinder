@@ -1,4 +1,4 @@
-module github.com/FDUTCH/pathfind
+module github.com/FDUTCH/Pathfinder
 
 go 1.23
 
