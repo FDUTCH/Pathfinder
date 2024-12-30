@@ -1,28 +1,6 @@
 package path
 
-//type BlockCost struct {
-//	Block world.Block
-//	Cost  float64
-//}
-//
-//type BlockPathType map[uint32]float64
-//
-//func (c BlockPathType) Cost(block world.Block) float64 {
-//	val, found := c[world.BlockRuntimeID(block)]
-//	if !found {
-//		return 3
-//	}
-//	return val
-//}
-//
-//func parseCost(arr ...BlockCost) map[uint32]float64 {
-//	var mp = make(map[uint32]float64, len(arr))
-//	for _, item := range arr {
-//		mp[world.BlockRuntimeID(item.Block)] = item.Cost
-//	}
-//	return mp
-//}
-
+// BlockPathType represents the type of the path.
 type BlockPathType byte
 
 const (
@@ -56,32 +34,32 @@ const (
 	COCOA
 )
 
-var BlockPathTypes = [...]BlockPathType{
-	BLOCKED,
-	OPEN,
-	WALKABLE,
-	WALKABLE_DOOR,
-	TRAPDOOR,
-	POWDER_SNOW,
-	DANGER_POWDER_SNOW,
-	FENCE,
-	LAVA,
-	WATER,
-	WATER_BORDER,
-	RAIL,
-	UNPASSABLE_RAIL,
-	DANGER_FIRE,
-	DAMAGE_FIRE,
-	DANGER_OTHER,
-	DAMAGE_OTHER,
-	DOOR_OPEN,
-	DOOR_WOOD_CLOSED,
-	DOOR_IRON_CLOSED,
-	BREACH,
-	LEAVES,
-	STICKY_HONEY,
-	COCOA,
-}
+////var BlockPathTypes = [...]Type{
+////	BLOCKED,
+////	OPEN,
+////	WALKABLE,
+////	WALKABLE_DOOR,
+////	TRAPDOOR,
+////	POWDER_SNOW,
+////	DANGER_POWDER_SNOW,
+////	FENCE,
+////	LAVA,
+////	WATER,
+////	WATER_BORDER,
+////	RAIL,
+////	UNPASSABLE_RAIL,
+////	DANGER_FIRE,
+////	DAMAGE_FIRE,
+////	DANGER_OTHER,
+////	DAMAGE_OTHER,
+////	DOOR_OPEN,
+////	DOOR_WOOD_CLOSED,
+////	DOOR_IRON_CLOSED,
+////	BREACH,
+////	LEAVES,
+////	STICKY_HONEY,
+////	COCOA,
+//}
 
 func (t BlockPathType) Malus() int {
 	return malus(t)

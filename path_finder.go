@@ -1,7 +1,6 @@
 package pathfind
 
 import (
-	"github.com/FDUTCH/Pathfinder/path"
 	"github.com/df-mc/dragonfly/server/block/cube"
 	"github.com/df-mc/dragonfly/server/world"
 	"math"
@@ -12,26 +11,26 @@ const (
 	FUDGING = 1.5
 )
 
-type PathFinder struct{}
-
-func (PathFinder) FindPath(evaluator NodeEvaluator, source world.BlockSource, pos, target cube.Pos, maxVisitedNodes int, maxDistanceFromStart float64, reachRange int) *Path {
+// FindPath builds a pathfind.Path from passed args.
+func FindPath(evaluator NodeEvaluator, source world.BlockSource, pos, target cube.Pos, maxVisitedNodes int, maxDistanceFromStart float64, reachRange int) *Path {
 	evaluator.Prepare(source, pos)
 
 	startNode := evaluator.StartNode()
 
 	actualTarget := evaluator.Goal(target)
 
-	result := actuallyFindPath(evaluator, startNode, actualTarget, maxVisitedNodes, maxDistanceFromStart, reachRange)
+	result := findPath(evaluator, startNode, actualTarget, maxVisitedNodes, maxDistanceFromStart, reachRange)
 
 	evaluator.Done()
 
 	return result
 }
 
-func actuallyFindPath(evaluator NodeEvaluator, startNode *Node, target *Target, maxVisitedNodes int, maxDistanceFromStart float64, reachRange int) *Path {
+// findPath finds from startNode to target.
+func findPath(evaluator NodeEvaluator, startNode *Node, target *Target, maxVisitedNodes int, maxDistanceFromStart float64, reachRange int) *Path {
 	openSet := NewBinaryHeap()
 	startNode.g = 0
-	startNode.h = BestH(startNode, target)
+	startNode.h = bestHeuristic(startNode, target)
 	startNode.f = startNode.h
 	openSet.Insert(startNode)
 
@@ -61,7 +60,7 @@ func actuallyFindPath(evaluator NodeEvaluator, startNode *Node, target *Target, 
 				if neighbor.walkedDistance < maxDistanceFromStart && (!neighbor.OpenSet() || newNeighborG < neighbor.g) {
 					neighbor.cameFrom = current
 					neighbor.g = newNeighborG
-					neighbor.h = BestH(neighbor, target) * FUDGING
+					neighbor.h = bestHeuristic(neighbor, target) * FUDGING
 
 					if neighbor.OpenSet() {
 						openSet.ChangeCost(neighbor, neighbor.g+neighbor.h)
@@ -77,7 +76,8 @@ func actuallyFindPath(evaluator NodeEvaluator, startNode *Node, target *Target, 
 	return reconstructPath(target.BestNode(), target.Pos, target.Reached())
 }
 
-func BestH(node *Node, targets ...*Target) float64 {
+// bestHeuristic returns best heuristics.
+func bestHeuristic(node *Node, targets ...*Target) float64 {
 	bestH := math.Inf(1)
 	for _, target := range targets {
 		h := node.Vec3().Sub(target.Vec3()).Len()
@@ -89,6 +89,7 @@ func BestH(node *Node, targets ...*Target) float64 {
 	return bestH
 }
 
+// reconstructPath...
 func reconstructPath(startNode *Node, target cube.Pos, reached bool) *Path {
 	var nodes []*Node
 	currentNode := startNode
@@ -100,14 +101,16 @@ func reconstructPath(startNode *Node, target cube.Pos, reached bool) *Path {
 	return NewPath(nodes, reached, target)
 }
 
+// NodeEvaluator interface that can be used to construct path using pathfind.FindPath.
 type NodeEvaluator interface {
+	// Prepare prepares Node evaluator.
 	Prepare(source world.BlockSource, pos cube.Pos)
+	// Done ...
 	Done()
-	Node(pos cube.Pos) *Node
+	// StartNode returns start Node.
 	StartNode() *Node
+	// Goal returns target.
 	Goal(pos cube.Pos) *Target
-	TargetFromNode(node *Node) *Target
+	// Neighbors ...
 	Neighbors(node *Node) []*Node
-	CachedBlockPathType(source world.BlockSource, pos cube.Pos) path.BlockPathType
-	BlockPathType(source world.BlockSource, pos cube.Pos) path.BlockPathType
 }

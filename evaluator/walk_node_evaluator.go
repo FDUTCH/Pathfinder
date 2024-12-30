@@ -2,7 +2,6 @@ package evaluator
 
 import (
 	"github.com/FDUTCH/Pathfinder"
-	"github.com/FDUTCH/Pathfinder/internal/util"
 	"github.com/FDUTCH/Pathfinder/path"
 	"github.com/df-mc/dragonfly/server/block"
 	"github.com/df-mc/dragonfly/server/block/cube"
@@ -15,18 +14,73 @@ import (
 	"slices"
 )
 
+type WalkNodeEvaluatorConfig struct {
+	CostMap           path.CostMap
+	Box               cube.BBox
+	Pos               mgl64.Vec3
+	CanPathDoors      bool
+	CanOpenDoors      bool
+	CanFloat          bool
+	CanWalkOverFences bool
+	MaxStepUp         float64
+	MaxFallDistance   int
+	LiquidsCanStandOn []world.Liquid
+}
+
+func (c WalkNodeEvaluatorConfig) New() *WalkNodeEvaluator {
+
+	if c.CostMap == nil {
+		c.CostMap = map[path.BlockPathType]float64{}
+	}
+
+	if c.MaxStepUp == 0 {
+		c.MaxStepUp = 1
+	}
+
+	if c.MaxFallDistance == 0 {
+		c.MaxFallDistance = 3
+	}
+
+	var liquids = make([]uint32, 0, len(c.LiquidsCanStandOn))
+
+	for _, l := range c.LiquidsCanStandOn {
+		liquids = append(liquids, world.BlockRuntimeID(l))
+	}
+
+	return &WalkNodeEvaluator{
+		pathTypeCostMap:       c.CostMap,
+		startPosition:         cube.PosFromVec3(c.Pos),
+		entitySizeInfo:        EntitySizeInfo{c.Box},
+		boundingBox:           c.Box.Translate(c.Pos),
+		canPassDoors:          c.CanPathDoors,
+		canOpenDoors:          c.CanOpenDoors,
+		canFloat:              c.CanFloat,
+		canWalkOverFences:     c.CanWalkOverFences,
+		maxUpStep:             c.MaxStepUp,
+		maxFallDistance:       c.MaxFallDistance,
+		liquidsThatCanStandOn: liquids,
+		pathTypesByPosCache:   map[cube.Pos]path.BlockPathType{},
+	}
+}
+
+// WalkNodeEvaluator implements pathfind.NodeEvaluator.
 type WalkNodeEvaluator struct {
-	pathTypeCostMap                                         path.CostMap
-	source                                                  world.BlockSource
-	startPosition                                           cube.Pos
-	nodes                                                   map[cube.Pos]*pathfind.Node
-	entitySizeInfo                                          EntitySizeInfo
-	boundingBox                                             cube.BBox
+	pathTypeCostMap path.CostMap
+	source          world.BlockSource
+
+	startPosition cube.Pos
+	nodes         map[cube.Pos]*pathfind.Node
+
+	entitySizeInfo EntitySizeInfo
+	boundingBox    cube.BBox
+
 	canPassDoors, canOpenDoors, canFloat, canWalkOverFences bool
-	maxUpStep                                               float64
-	maxFallDistance                                         int
-	liquidsThatCanStandOn                                   []uint32
-	pathTypesByPosCache                                     map[cube.Pos]path.BlockPathType
+
+	maxUpStep             float64
+	maxFallDistance       int
+	liquidsThatCanStandOn []uint32
+
+	pathTypesByPosCache map[cube.Pos]path.BlockPathType
 }
 
 func (e *WalkNodeEvaluator) TargetFromNode(node *pathfind.Node) *pathfind.Target {
@@ -50,9 +104,9 @@ func (e *WalkNodeEvaluator) StartNode() *pathfind.Node {
 	y := pos.Y()
 	bl := e.source.Block(pos)
 	if l, liquid := bl.(world.Liquid); !(liquid && e.CanStandOnFluid(l)) {
-		if water, isWater := bl.(block.Water); isWater && e.CanFloat() && e.isEntityUnderwater() {
+		if water, isWater := bl.(block.Water); isWater && e.canFloat && e.isEntityUnderwater() {
 			for {
-				if !(isWater && util.IsSourceWaterBlock(water)) {
+				if !(isWater && isSourceWaterBlock(water)) {
 					y--
 					break
 				}
@@ -102,8 +156,8 @@ func (e *WalkNodeEvaluator) Node(pos cube.Pos) *pathfind.Node {
 
 func (e *WalkNodeEvaluator) startNode(pos cube.Pos) *pathfind.Node {
 	node := e.Node(pos)
-	node.BlockPathType = e.CachedBlockPathType(e.source, node.Pos)
-	node.CostMalus = e.pathTypeCostMap.PathfindingMalus(node.BlockPathType)
+	node.Type = e.CachedBlockPathType(e.source, node.Pos)
+	node.CostMalus = e.pathTypeCostMap.PathfindingMalus(node.Type)
 	return node
 }
 
@@ -142,10 +196,12 @@ func (e *WalkNodeEvaluator) Neighbors(node *pathfind.Node) []*pathfind.Node {
 	return nodes
 }
 
+// IsNeighborValid checks if neighbor valid for passed node.
 func (e *WalkNodeEvaluator) IsNeighborValid(neighbor, node *pathfind.Node) bool {
 	return !neighbor.Closed && (neighbor.CostMalus >= 0 || node.CostMalus < 0)
 }
 
+// IsDiagonalValid checks if diagonal node valid for passed node.
 func (e *WalkNodeEvaluator) IsDiagonalValid(node, neighbor1, neighbor2, diagonal *pathfind.Node) bool {
 	switch {
 	case neighbor1 == nil || neighbor2 == nil:
@@ -155,12 +211,12 @@ func (e *WalkNodeEvaluator) IsDiagonalValid(node, neighbor1, neighbor2, diagonal
 
 	case neighbor1.Y() > node.Y() || neighbor2.Y() > node.Y():
 		return false
-	case neighbor1.BlockPathType != path.WALKABLE_DOOR &&
-		neighbor2.BlockPathType != path.WALKABLE_DOOR &&
-		diagonal.BlockPathType != path.WALKABLE_DOOR:
-		isFence := neighbor1.BlockPathType != path.FENCE &&
-			neighbor2.BlockPathType != path.FENCE &&
-			diagonal.BlockPathType != path.FENCE &&
+	case neighbor1.Type != path.WALKABLE_DOOR &&
+		neighbor2.Type != path.WALKABLE_DOOR &&
+		diagonal.Type != path.WALKABLE_DOOR:
+		isFence := neighbor1.Type != path.FENCE &&
+			neighbor2.Type != path.FENCE &&
+			diagonal.Type != path.FENCE &&
 			e.entitySizeInfo.Width() < 0.5
 
 		return diagonal.CostMalus >= 0 &&
@@ -170,6 +226,7 @@ func (e *WalkNodeEvaluator) IsDiagonalValid(node, neighbor1, neighbor2, diagonal
 	return false
 }
 
+// AcceptedNode returns node from position.
 func (e *WalkNodeEvaluator) AcceptedNode(pos cube.Pos, remainingJumpHeight int, floorLevel float64, facing cube.Face, originPathType path.BlockPathType) (resultNode *pathfind.Node) {
 	if e.floorLevel(pos.Vec3())-floorLevel > e.mobJumpHeight() {
 		return
@@ -188,13 +245,13 @@ func (e *WalkNodeEvaluator) AcceptedNode(pos cube.Pos, remainingJumpHeight int, 
 
 	if currentPathType != path.WALKABLE && currentPathType != path.WATER {
 		if (resultNode == nil || resultNode.CostMalus < 0) && remainingJumpHeight > 0 &&
-			(currentPathType != path.FENCE || e.CanWalkOverFences()) &&
+			(currentPathType != path.FENCE || e.canWalkOverFences) &&
 			currentPathType != path.UNPASSABLE_RAIL &&
 			currentPathType != path.TRAPDOOR &&
 			currentPathType != path.POWDER_SNOW {
 			resultNode = e.AcceptedNode(pos.Add(cube.Pos{0, 1, 0}), remainingJumpHeight-1, floorLevel, facing, originPathType)
 			width := e.entitySizeInfo.Width()
-			if resultNode != nil && (resultNode.BlockPathType == path.OPEN || resultNode.BlockPathType == path.WALKABLE) && width < 1 {
+			if resultNode != nil && (resultNode.Type == path.OPEN || resultNode.Type == path.WALKABLE) && width < 1 {
 				halfWidth := width / 2
 				sidePos := pos.Side(facing).Vec3Middle()
 				y1 := e.floorLevel(sidePos.Add(mgl64.Vec3{0, 1, 0}))
@@ -212,7 +269,7 @@ func (e *WalkNodeEvaluator) AcceptedNode(pos cube.Pos, remainingJumpHeight int, 
 				}
 			}
 		}
-		if !e.CanFloat() {
+		if !e.canFloat {
 			if e.CachedBlockPathType(e.source, pos.Sub(cube.Pos{0, 1, 0})) == path.WATER {
 				return resultNode
 			}
@@ -237,7 +294,7 @@ func (e *WalkNodeEvaluator) AcceptedNode(pos cube.Pos, remainingJumpHeight int, 
 				}
 
 				fallDistance++
-				if fallDistance >= e.MaxFallDistance() {
+				if fallDistance >= e.maxFallDistance {
 					return e.blockedNode(pos)
 				}
 
@@ -259,7 +316,7 @@ func (e *WalkNodeEvaluator) AcceptedNode(pos cube.Pos, remainingJumpHeight int, 
 		if BlockHavePartialCollision(currentPathType) && resultNode == nil {
 			resultNode = e.Node(pos)
 			resultNode.Closed = true
-			resultNode.BlockPathType = currentPathType
+			resultNode.Type = currentPathType
 			resultNode.CostMalus = float64(currentPathType.Malus())
 		}
 
@@ -268,14 +325,16 @@ func (e *WalkNodeEvaluator) AcceptedNode(pos cube.Pos, remainingJumpHeight int, 
 	return resultNode
 }
 
+// blockedNode returns new blocked pathfind.Node.
 func (e *WalkNodeEvaluator) blockedNode(pos cube.Pos) *pathfind.Node {
 	node := e.Node(pos)
-	node.BlockPathType = path.BLOCKED
+	node.Type = path.BLOCKED
 	node.CostMalus = -1
 
 	return node
 }
 
+// canReachWithoutCollision ...
 func (e *WalkNodeEvaluator) canReachWithoutCollision(node *pathfind.Node) (result bool) {
 	bb := e.boundingBox
 	mobPos := e.startPosition
@@ -298,6 +357,7 @@ func (e *WalkNodeEvaluator) canReachWithoutCollision(node *pathfind.Node) (resul
 	return true
 }
 
+// hasCollisions ...
 func (e *WalkNodeEvaluator) hasCollisions(bb cube.BBox) (result bool) {
 	Max := cube.PosFromVec3(bb.Max()).Add(cube.Pos{1, 1, 1})
 	Min := cube.PosFromVec3(bb.Min()).Sub(cube.Pos{1, 1, 1})
@@ -321,6 +381,7 @@ func (e *WalkNodeEvaluator) hasCollisions(bb cube.BBox) (result bool) {
 	return false
 }
 
+// BlockHavePartialCollision ...
 func BlockHavePartialCollision(pathType path.BlockPathType) bool {
 	switch pathType {
 	case path.FENCE, path.DOOR_WOOD_CLOSED, path.DOOR_IRON_CLOSED:
@@ -330,27 +391,31 @@ func BlockHavePartialCollision(pathType path.BlockPathType) bool {
 	}
 }
 
+// nodeAndUpdateCostToMax ...
 func (e *WalkNodeEvaluator) nodeAndUpdateCostToMax(pos cube.Pos, pathType path.BlockPathType, malus float64) *pathfind.Node {
 	node := e.Node(pos)
-	node.BlockPathType = pathType
+	node.Type = pathType
 	node.CostMalus = max(node.CostMalus, malus)
 	return node
 }
 
+// mobJumpHeight ...
 func (e *WalkNodeEvaluator) mobJumpHeight() float64 {
-	return max(DefaultMobJumpHeight, e.MaxUpStep())
+	return max(DefaultMobJumpHeight, e.maxUpStep)
 }
 
+// floorLevel ...
 func (e *WalkNodeEvaluator) floorLevel(pos mgl64.Vec3) float64 {
 	switch e.source.Block(cube.PosFromVec3(pos)).(type) {
 	case block.Water:
-		if e.CanFloat() {
+		if e.canFloat {
 			return pos[1] + 0.5
 		}
 	}
 	return FloorLevelAt(e.source, pos)
 }
 
+// FloorLevelAt returns floor level at position passed.
 func FloorLevelAt(source world.BlockSource, pos mgl64.Vec3) (result float64) {
 	down := pos.Sub(mgl64.Vec3{0, 1, 0})
 
@@ -374,7 +439,7 @@ func (e *WalkNodeEvaluator) BlockPathTypes(source world.BlockSource, pos cube.Po
 	for currentX := 0; currentX < entityWidth; currentX++ {
 		for currentY := 0; currentY < entityHeight; currentY++ {
 			for currentZ := 0; currentZ < entityDepth; currentZ++ {
-				currentPathType := e.evaluateBlockPathType(source, mobPos, e.BlockPathType(source, pos.Add(cube.Pos{currentX, currentY, currentZ})))
+				currentPathType := e.evaluateBlockPathType(source, mobPos, BlockPathType(source, pos.Add(cube.Pos{currentX, currentY, currentZ})))
 				if currentX == 0 && currentY == 0 && currentZ == 0 {
 					pathType = currentPathType
 				}
@@ -389,8 +454,8 @@ func (e *WalkNodeEvaluator) BlockPathTypes(source world.BlockSource, pos cube.Po
 }
 
 func (e *WalkNodeEvaluator) evaluateBlockPathType(source world.BlockSource, mobPos cube.Pos, pathType path.BlockPathType) path.BlockPathType {
-	canPassDoors := e.CanPassDoors()
-	if pathType == path.DOOR_WOOD_CLOSED && e.CanOpenDoors() && canPassDoors {
+	canPassDoors := e.canPassDoors
+	if pathType == path.DOOR_WOOD_CLOSED && e.canPassDoors && canPassDoors {
 		pathType = path.WALKABLE_DOOR
 	} else if pathType == path.DOOR_OPEN && canPassDoors {
 		pathType = path.BLOCKED
@@ -401,15 +466,17 @@ func (e *WalkNodeEvaluator) evaluateBlockPathType(source world.BlockSource, mobP
 	return pathType
 }
 
+// CachedBlockPathType returns cached path.BlockPathType from position.
 func (e *WalkNodeEvaluator) CachedBlockPathType(source world.BlockSource, pos cube.Pos) path.BlockPathType {
 	t, has := e.pathTypesByPosCache[pos]
 	if !has {
-		t = e.BlockPathTypeAt(source, pos)
+		t = e.blockPathTypeAt(source, pos)
 		e.pathTypesByPosCache[pos] = t
 	}
 	return t
 }
 
+// isEntityUnderwater ...
 func (e *WalkNodeEvaluator) isEntityUnderwater() bool {
 	start := e.startPosition
 	start[1] += e.entitySizeInfo.heightInt()
@@ -423,7 +490,8 @@ func (e *WalkNodeEvaluator) isEntityUnderwater() bool {
 	return (float64(e.startPosition[1]) + e.entitySizeInfo.Height()) < f
 }
 
-func (e *WalkNodeEvaluator) BlockPathTypeAt(source world.BlockSource, pos cube.Pos) path.BlockPathType {
+// blockPathTypeAt returns  path.BlockPathType for passed position.
+func (e *WalkNodeEvaluator) blockPathTypeAt(source world.BlockSource, pos cube.Pos) path.BlockPathType {
 	currentPathType, pathTypes := e.BlockPathTypes(source, pos, path.BLOCKED, e.startPosition)
 	for _, unpassableType := range []path.BlockPathType{path.FENCE, path.UNPASSABLE_RAIL} {
 		if slices.Contains(pathTypes, unpassableType) {
@@ -448,10 +516,7 @@ func (e *WalkNodeEvaluator) BlockPathTypeAt(source world.BlockSource, pos cube.P
 	return bestPathType
 }
 
-func (e *WalkNodeEvaluator) BlockPathType(source world.BlockSource, pos cube.Pos) path.BlockPathType {
-	return BlockPathType(source, pos)
-}
-
+// BlockPathType returns path.BlockPathType for passed position.
 func BlockPathType(source world.BlockSource, pos cube.Pos) path.BlockPathType {
 	pathType := BlockPathTypeRaw(source, pos)
 	if pathType == path.OPEN && pos[1] >= (-64+1) {
@@ -484,6 +549,7 @@ func BlockPathType(source world.BlockSource, pos cube.Pos) path.BlockPathType {
 	return pathType
 }
 
+// CheckNeighbourBlocks returns path.BlockPathType for neighbour block.
 func CheckNeighbourBlocks(source world.BlockSource, pos cube.Pos, pathType path.BlockPathType) path.BlockPathType {
 	for currentX := -1; currentX <= 1; currentX++ {
 		for currentY := -1; currentY <= 1; currentY++ {
@@ -508,6 +574,7 @@ func CheckNeighbourBlocks(source world.BlockSource, pos cube.Pos, pathType path.
 	return pathType
 }
 
+// BlockPathTypeRaw returns path.BlockPathType depending on the block.
 func BlockPathTypeRaw(source world.BlockSource, pos cube.Pos) path.BlockPathType {
 	bl := source.Block(pos)
 
@@ -551,6 +618,10 @@ func BlockPathTypeRaw(source world.BlockSource, pos cube.Pos) path.BlockPathType
 		}
 		return path.BLOCKED
 	}
+}
+
+func isSourceWaterBlock(bl block.Water) bool {
+	return !bl.Falling && bl.Depth == 0
 }
 
 const (
