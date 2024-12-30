@@ -34,33 +34,6 @@ const (
 	COCOA
 )
 
-////var BlockPathTypes = [...]Type{
-////	BLOCKED,
-////	OPEN,
-////	WALKABLE,
-////	WALKABLE_DOOR,
-////	TRAPDOOR,
-////	POWDER_SNOW,
-////	DANGER_POWDER_SNOW,
-////	FENCE,
-////	LAVA,
-////	WATER,
-////	WATER_BORDER,
-////	RAIL,
-////	UNPASSABLE_RAIL,
-////	DANGER_FIRE,
-////	DAMAGE_FIRE,
-////	DANGER_OTHER,
-////	DAMAGE_OTHER,
-////	DOOR_OPEN,
-////	DOOR_WOOD_CLOSED,
-////	DOOR_IRON_CLOSED,
-////	BREACH,
-////	LEAVES,
-////	STICKY_HONEY,
-////	COCOA,
-//}
-
 func (t BlockPathType) Malus() int {
 	return malus(t)
 }
