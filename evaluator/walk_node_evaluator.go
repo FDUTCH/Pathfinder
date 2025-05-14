@@ -83,6 +83,38 @@ type WalkNodeEvaluator struct {
 	pathTypesByPosCache map[cube.Pos]path.BlockPathType
 }
 
+func (e *WalkNodeEvaluator) CanPassDoors() bool {
+	return e.canPassDoors
+}
+
+func (e *WalkNodeEvaluator) SetCanPassDoors(canPassDoors bool) {
+	e.canPassDoors = canPassDoors
+}
+
+func (e *WalkNodeEvaluator) CanOpenDoors() bool {
+	return e.canOpenDoors
+}
+
+func (e *WalkNodeEvaluator) SetCanOpenDoors(canOpenDoors bool) {
+	e.canOpenDoors = canOpenDoors
+}
+
+func (e *WalkNodeEvaluator) CanFloat() bool {
+	return e.canFloat
+}
+
+func (e *WalkNodeEvaluator) SetCanFloat(canFloat bool) {
+	e.canFloat = canFloat
+}
+
+func (e *WalkNodeEvaluator) CanWalkOverFences() bool {
+	return e.canWalkOverFences
+}
+
+func (e *WalkNodeEvaluator) SetCanWalkOverFences(canWalkOverFences bool) {
+	e.canWalkOverFences = canWalkOverFences
+}
+
 func (e *WalkNodeEvaluator) TargetFromNode(node *pathfind.Node) *pathfind.Target {
 	return pathfind.NewTarget(node)
 }
@@ -166,15 +198,20 @@ func (e *WalkNodeEvaluator) Goal(pos cube.Pos) *pathfind.Target {
 }
 
 func (e *WalkNodeEvaluator) Neighbors(node *pathfind.Node) []*pathfind.Node {
-	var nodes []*pathfind.Node
-	maxUpStep := 0
-	pathType := e.CachedBlockPathType(e.source, node.Pos)
-	pathTypeAbove := e.CachedBlockPathType(e.source, node.Add(cube.Pos{0, 1, 0}))
+	var (
+		nodes         []*pathfind.Node
+		maxUpStep     int
+		pathType      = e.CachedBlockPathType(e.source, node.Pos)
+		pathTypeAbove = e.CachedBlockPathType(e.source, node.Add(cube.Pos{0, 1, 0}))
+	)
+
 	if e.pathTypeCostMap.PathfindingMalus(pathTypeAbove) >= 0 && path.STICKY_HONEY != pathType {
 		maxUpStep = int(max(1, e.maxUpStep))
 	}
+
 	floorLevel := e.floorLevel(node.Vec3())
 	horizontalNeighbors := map[cube.Face]*pathfind.Node{}
+
 	for _, side := range cube.HorizontalFaces() {
 		neighborPos := node.Side(side)
 		neighborNode := e.AcceptedNode(neighborPos, maxUpStep, floorLevel, side, pathType)
@@ -183,6 +220,7 @@ func (e *WalkNodeEvaluator) Neighbors(node *pathfind.Node) []*pathfind.Node {
 			nodes = append(nodes, neighborNode)
 		}
 	}
+
 	for _, zFace := range []cube.Face{cube.FaceNorth, cube.FaceSouth} {
 		zFacePos := node.Side(zFace)
 		for _, xFace := range []cube.Face{cube.FaceEast, cube.FaceWest} {
@@ -193,6 +231,7 @@ func (e *WalkNodeEvaluator) Neighbors(node *pathfind.Node) []*pathfind.Node {
 			}
 		}
 	}
+
 	return nodes
 }
 
@@ -425,6 +464,7 @@ func FloorLevelAt(source world.BlockSource, pos mgl64.Vec3) (result float64) {
 			result = down.Y()
 		}
 	}()
+
 	traceResult, ok := trace.BlockIntercept(cube.PosFromVec3(down), source, source.Block(cube.PosFromVec3(down)), pos, down)
 	if !ok {
 		return down.Y()
