@@ -29,6 +29,10 @@ func (p *Path) Advance() {
 	p.nextNodeIndex++
 }
 
+func (p *Path) Reached() bool {
+	return p.reached
+}
+
 func (p *Path) NotStarted() bool {
 	return p.nextNodeIndex <= 0
 }
